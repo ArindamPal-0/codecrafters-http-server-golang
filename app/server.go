@@ -23,15 +23,17 @@ func main() {
 	}
 	defer conn.Close()
 
-	requestBytes := []byte{}
-	_, err = conn.Read(requestBytes)
+	requestBytes := make([]byte, 1024)
+	requestLength, err := conn.Read(requestBytes)
 	if err != nil {
 		fmt.Println("Error reading request: ", err.Error())
+		os.Exit(1)
 	}
+	fmt.Println("Request Length: ", requestLength)
 
 	_, err = conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 	if err != nil {
 		fmt.Println("Error sending response: ", err.Error())
+		os.Exit(1)
 	}
-
 }
