@@ -61,7 +61,8 @@ func ParseRequest(requestStr string) Request {
 	headers := ParseHeaders(headerLines)
 
 	// http body
-	body := []byte{}
+	bodyStartIndex := strings.Index(requestStr, "\r\n\r\n") + 4
+	body := []byte(requestStr[bodyStartIndex:])
 
 	return Request{
 		Method:      httpMethod,
@@ -77,7 +78,8 @@ type StatusCode string
 const (
 	Status_NotFound StatusCode = "404 Not Found"
 
-	Status_OK = "200 OK"
+	Status_OK      = "200 OK"
+	Status_Created = "201 Created"
 )
 
 type Response struct {
@@ -130,54 +132,71 @@ func Router(request *Request) Response {
 		Body:        []byte{},
 	}
 
-	if request.Path == "/" {
-		response.StatusCode = Status_OK
-	} else if strings.HasPrefix(request.Path, "/echo/") {
-		echoText := strings.TrimPrefix(request.Path, "/echo/")
-
-		fmt.Println("> echo text: ", echoText)
-		response.StatusCode = Status_OK
-		response.Headers = map[string]string{
-			"Content-Type":   "text/plain",
-			"Content-Length": fmt.Sprint(len(echoText)),
-		}
-		response.Body = []byte(echoText)
-	} else if request.Path == "/user-agent" {
-		userAgent, isUserAgentPresent := request.Headers["user-agent"]
-		if isUserAgentPresent {
-			// set status code 200
+	if request.Method == "GET" {
+		if request.Path == "/" {
 			response.StatusCode = Status_OK
-			// set headers
+		} else if strings.HasPrefix(request.Path, "/echo/") {
+			echoText := strings.TrimPrefix(request.Path, "/echo/")
+
+			fmt.Println("> echo text: ", echoText)
+			response.StatusCode = Status_OK
 			response.Headers = map[string]string{
 				"Content-Type":   "text/plain",
-				"Content-Length": fmt.Sprint(len(userAgent)),
+				"Content-Length": fmt.Sprint(len(echoText)),
 			}
-			// set body
-			response.Body = []byte(userAgent)
-		}
-	} else if strings.HasPrefix(request.Path, "/files/") {
-		fileName := strings.TrimPrefix(request.Path, "/files/")
-		fmt.Println("> fileName: ", fileName)
-
-		if os.Args[1] == "--directory" {
-			directory := os.Args[2]
-			data, err := os.ReadFile(fmt.Sprintf("%s/%s", directory, fileName))
-			if err != nil {
-				fmt.Println("Error reading file: ", err.Error())
-			} else {
-				// set status code
+			response.Body = []byte(echoText)
+		} else if request.Path == "/user-agent" {
+			userAgent, isUserAgentPresent := request.Headers["user-agent"]
+			if isUserAgentPresent {
+				// set status code 200
 				response.StatusCode = Status_OK
 				// set headers
 				response.Headers = map[string]string{
-					"Content-Type":   "application/octet-stream",
-					"Content-Length": fmt.Sprint(len(data)),
+					"Content-Type":   "text/plain",
+					"Content-Length": fmt.Sprint(len(userAgent)),
 				}
 				// set body
-				response.Body = data
+				response.Body = []byte(userAgent)
 			}
+		} else if strings.HasPrefix(request.Path, "/files/") {
+			fileName := strings.TrimPrefix(request.Path, "/files/")
+			fmt.Println("> fileName: ", fileName)
 
+			if os.Args[1] == "--directory" {
+				directory := os.Args[2]
+				data, err := os.ReadFile(fmt.Sprintf("%s/%s", directory, fileName))
+				if err != nil {
+					fmt.Println("Error reading file: ", err.Error())
+				} else {
+					// set status code
+					response.StatusCode = Status_OK
+					// set headers
+					response.Headers = map[string]string{
+						"Content-Type":   "application/octet-stream",
+						"Content-Length": fmt.Sprint(len(data)),
+					}
+					// set body
+					response.Body = data
+				}
+
+			}
 		}
 
+	} else if request.Method == "POST" {
+		if strings.HasPrefix(request.Path, "/files/") {
+			fileName := strings.TrimPrefix(request.Path, "/files/")
+			fmt.Println("> fileName: ", fileName)
+
+			if os.Args[1] == "--directory" {
+				directory := os.Args[2]
+				err := os.WriteFile(fmt.Sprintf("%s/%s", directory, fileName), request.Body, 0666)
+				if err != nil {
+					fmt.Println("Error writing to file: ", err.Error())
+				} else {
+					response.StatusCode = Status_Created
+				}
+			}
+		}
 	}
 
 	return response
