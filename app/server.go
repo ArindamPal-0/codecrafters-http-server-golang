@@ -15,6 +15,21 @@ type Request struct {
 	Body        []byte
 }
 
+func ParseHeaders(headersStr []string) map[string]string {
+	headers := map[string]string{}
+
+	for _, headerStr := range headersStr {
+		headerSplit := strings.Split(headerStr, ":")
+
+		key := strings.ToLower(strings.TrimSpace(headerSplit[0]))
+		value := strings.TrimSpace(headerSplit[1])
+
+		headers[key] = value
+	}
+
+	return headers
+}
+
 func ParseRequest(requestStr string) Request {
 
 	lines := strings.Split(requestStr, "\r\n")
@@ -33,7 +48,17 @@ func ParseRequest(requestStr string) Request {
 	httpVersion := startLineSplit[2]
 
 	// http headers
-	headers := map[string]string{}
+
+	// get the line index after http headers
+	headersEndIndex := 0
+	for index, line := range lines {
+		if line == "" {
+			headersEndIndex = index
+			break
+		}
+	}
+	headerLines := lines[1:headersEndIndex]
+	headers := ParseHeaders(headerLines)
 
 	// http body
 	body := []byte{}
@@ -119,6 +144,17 @@ func Router(request *Request) Response {
 			"Content-Length": fmt.Sprintf("%d", len(echoText)),
 		}
 		response.Body = []byte(echoText)
+	} else if request.Path == "/user-agent" {
+		userAgent, isUserAgentPresent := request.Headers["user-agent"]
+		if isUserAgentPresent {
+			// set status code 200
+			response.StatusCode = Status_OK
+			// set headers
+			response.Headers["Content-Type"] = "text/plain"
+			response.Headers["Content-Length"] = fmt.Sprint(len(userAgent))
+			// set body
+			response.Body = []byte(userAgent)
+		}
 	}
 
 	return response
@@ -163,9 +199,11 @@ func handleConnection(conn net.Conn) {
 
 	// parse request
 	request := ParseRequest(requestStr)
+	fmt.Printf("> parsed request: %+v\n", request)
 
 	// get response
 	response := Router(&request)
+	fmt.Printf("> generated response: %+v\n", response)
 
 	// send response
 	response.Send(conn)
