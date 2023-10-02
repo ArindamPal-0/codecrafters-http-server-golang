@@ -114,13 +114,11 @@ func (response *Response) getResponseBytes() []byte {
 	return responseBytes
 }
 
-func (response *Response) Send(conn net.Conn) {
+func (response *Response) Send(conn net.Conn) error {
 	responseBytes := response.getResponseBytes()
 	_, err := conn.Write(responseBytes)
-	if err != nil {
-		fmt.Println("Error sending response: ", err.Error())
-		os.Exit(1)
-	}
+
+	return err
 }
 
 func Router(request *Request) Response {
@@ -176,7 +174,7 @@ func main() {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
 		}
-		handleConnection(conn)
+		go handleConnection(conn)
 	}
 }
 
@@ -190,7 +188,7 @@ func handleConnection(conn net.Conn) {
 	requestLength, err := conn.Read(requestBytes)
 	if err != nil {
 		fmt.Println("Error reading request: ", err.Error())
-		os.Exit(1)
+		return
 	}
 	fmt.Println("> Request Length: ", requestLength)
 
@@ -206,5 +204,8 @@ func handleConnection(conn net.Conn) {
 	fmt.Printf("> generated response: %+v\n", response)
 
 	// send response
-	response.Send(conn)
+	err = response.Send(conn)
+	if err != nil {
+		fmt.Println("Error sending response: ", err.Error())
+	}
 }
