@@ -139,7 +139,7 @@ func Router(request *Request) Response {
 		response.StatusCode = Status_OK
 		response.Headers = map[string]string{
 			"Content-Type":   "text/plain",
-			"Content-Length": fmt.Sprintf("%d", len(echoText)),
+			"Content-Length": fmt.Sprint(len(echoText)),
 		}
 		response.Body = []byte(echoText)
 	} else if request.Path == "/user-agent" {
@@ -148,11 +148,36 @@ func Router(request *Request) Response {
 			// set status code 200
 			response.StatusCode = Status_OK
 			// set headers
-			response.Headers["Content-Type"] = "text/plain"
-			response.Headers["Content-Length"] = fmt.Sprint(len(userAgent))
+			response.Headers = map[string]string{
+				"Content-Type":   "text/plain",
+				"Content-Length": fmt.Sprint(len(userAgent)),
+			}
 			// set body
 			response.Body = []byte(userAgent)
 		}
+	} else if strings.HasPrefix(request.Path, "/files/") {
+		fileName := strings.TrimPrefix(request.Path, "/files/")
+		fmt.Println("> fileName: ", fileName)
+
+		if os.Args[1] == "--directory" {
+			directory := os.Args[2]
+			data, err := os.ReadFile(fmt.Sprintf("%s/%s", directory, fileName))
+			if err != nil {
+				fmt.Println("Error reading file: ", err.Error())
+			} else {
+				// set status code
+				response.StatusCode = Status_OK
+				// set headers
+				response.Headers = map[string]string{
+					"Content-Type":   "application/octet-stream",
+					"Content-Length": fmt.Sprint(len(data)),
+				}
+				// set body
+				response.Body = data
+			}
+
+		}
+
 	}
 
 	return response
